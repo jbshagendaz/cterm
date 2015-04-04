@@ -1,0 +1,10 @@
+(sh "ls" "-a")
+quite
+quit
+(use '[clojure.java.shell :only [sh]])
+(sh "ls" "-aul")
+(sh "ls" "-a")
+(println (sh "ls" "-a"))
+quit
+(sh "ls" "-a")
+quit
