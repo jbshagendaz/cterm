@@ -1,14 +1,17 @@
 (ns cterm.core
-  (use [clojure.java.shell :only [sh]]))
+  (use [clojure.string :only [split]])
+  (require [clj-commons-exec :as exec]))
+
+(defn print-prompt
+  []
+  ;(printf (str (get @(exec/sh ["pwd"]) :out))) 
+  (printf "$ ")
+  (flush))
 
 (defn -main 
   []
-   (println "Enter text:")
-    
-   (loop  [input  (read-line)]
-     (when-not  (= ":done" input)
-       (println  (str "You entered: >>" input "<<"))
-       (recur  (read-line))))
-    
-   (println "End")
-   )
+  (print-prompt)
+  (doseq  
+    [line (take-while (partial not= "exit") (repeatedly read-line))]
+     (println  @(exec/sh (split line #" ")))
+     (print-prompt)))
