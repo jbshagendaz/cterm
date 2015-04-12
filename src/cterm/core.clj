@@ -3,7 +3,6 @@
                               split 
                               trim 
                               trim-newline]])
-
   (require [clj-commons-exec :as exec]))
 
 
@@ -32,6 +31,8 @@
      :pipe-input-1 (when pipe? (split (trim (first  (split input #"\|"))) #"\s+"))
      :pipe-input-2 (when pipe? (split (trim (second (split input #"\|"))) #"\s+")) 
      
+     ;history
+
      ;new process 
      :process? ()}))
 
@@ -46,14 +47,23 @@
   (when (not (nil? (output-map :err))) (println (output-map :err)))
   (when (not (nil? (output-map :out))) (println (output-map :out))))
 
+(defn print-history [history]
+  (doseq [i (range 0 (count history))]
+    (println i (get history i))))
+
 (defn -main 
   []
+  (def history [])
   (print-prompt (get @(exec/sh ["pwd"]) :out)) 
   (doseq  
     [line (take-while (partial not= "quit") (repeatedly read-line))]
-     (->> (process-input line) 
-          (execute-input)
-          (print-output))
-     
+     (cond
+       (boolean (re-find #"history" line)) (print-history history)
+       :else 
+        (->> (process-input line) 
+             (execute-input)
+             (print-output)))
+
      ;(println (process-input line))
+     (def history (conj history (vector line)))  
      (print-prompt (get @(exec/sh ["pwd"]) :out))))
