@@ -1,5 +1,6 @@
 (ns cterm.core
-  (use [clojure.string :only [replace-first 
+  (use [clojure.string :only [join
+                              replace-first 
                               split 
                               trim 
                               trim-newline]])
@@ -7,11 +8,14 @@
 
 
 ;;Variables
-(def last-dir (:out @(exec/sh ["pwd"])))
-(def curr-dir (:out @(exec/sh ["pwd"])))
+(def last-dir (trim-newline (:out @(exec/sh ["pwd"]))))
+(def curr-dir (trim-newline (:out @(exec/sh ["pwd"]))))
 (def history [])
 
 ;;Misc Functions
+(defn count-substring [string sub]
+  (count (re-seq (re-pattern sub) string)))
+
 (defn get-home []
   (trim-newline (:out @(exec/sh ["printenv" "HOME"]))))
 
@@ -19,13 +23,16 @@
   (trim-newline (replace-first dir (get-home) "~")))
 
 (defn print-prompt []
-  (printf "\n%s\t%s" (replace-home curr-dir) (:out @(exec/sh ["date" "+%X"]))) 
+  (printf "\n%s\t%s" (replace-home (:out @(exec/sh ["pwd"] {:dir curr-dir}))) (:out @(exec/sh ["date" "+%X"]))) 
   (printf "$ ")
   (flush))
 
 (defn print-history []
   (doseq [i (range 0 (count history))]
     (println i (get history i))))
+
+(defn go-back [x]
+  (join "/" (take (+ x 1) (split curr-dir #"/"))))
 
 
 ;;User Input Functions
@@ -40,7 +47,8 @@
      :cd? cd?
      :rel?  (when cd? (not= \/ (get (second input-vector) 0)))
      :abs?  (when cd? (= \/ (get (second input-vector) 0)))
-   
+     :back? (when cd? (boolean (re-find #"\.." (second input-vector))))
+
      ;history
      :history? (boolean (re-find #"history" input))
      
@@ -55,8 +63,12 @@
 (defn execute-input [input-map]
   "Takes in a map of analyzed input and executes the command"
   (def last-dir curr-dir) 
-  (when (input-map :rel?) (def curr-dir (str curr-dir "/" (second (input-map :input-vector)))))
-  (when (input-map :abs?) (def curr-dir (second (input-map :input-vector))))
+ 
+  (when (input-map :cd?)  
+    (cond
+      (input-map :back?) (def curr-dir (go-back (- (count-substring curr-dir "/") (count-substring (second (input-map :input-vector)) "..")))) 
+      (input-map :abs?) (def curr-dir (second (input-map :input-vector)))
+      :else (def curr-dir (str curr-dir "/" (second (input-map :input-vector))))))
   
   (cond
     (input-map :cd?) (let [output-map @(exec/sh ["cd" curr-dir])]
