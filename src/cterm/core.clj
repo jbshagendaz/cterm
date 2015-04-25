@@ -40,7 +40,10 @@
      :cd? cd?
      :rel?  (when cd? (not= \/ (get (second input-vector) 0)))
      :abs?  (when cd? (= \/ (get (second input-vector) 0)))
-    
+   
+     ;history
+     :history? (boolean (re-find #"history" input))
+     
      ;pipes 
      :pipe? pipe?   
      :pipe-input-1 (when pipe? (split (trim (first  (split input #"\|"))) #"\s+"))
@@ -59,6 +62,10 @@
     (input-map :cd?) (let [output-map @(exec/sh ["cd" curr-dir])]
                        (when (not (nil? (:err output-map))) (do (def curr-dir last-dir)))
                        output-map)
+
+    (input-map :history?) (let [] 
+                            (print-history)
+                            {:exit 0})
 
     (input-map :pipe?) @(last (exec/sh-pipe (input-map :pipe-input-1) 
                                             (input-map :pipe-input-2) 
@@ -79,13 +86,11 @@
   []
   (print-prompt) 
   (doseq  
-    [line (take-while (partial not= "quit") (repeatedly read-line))]
-     (cond
-       (boolean (re-find #"history" line)) (print-history)
-       :else 
-        (->> (process-input line) 
-             (execute-input)
-             (print-output)))
-
-     (def history (conj history (vector line)))  
-     (print-prompt)))
+    [line (take-while (partial not= "quit") (repeatedly read-line))] 
+    
+    (->> (process-input line) 
+         (execute-input)
+         (print-output))
+    
+    (def history (conj history (vector line)))  
+    (print-prompt)))
