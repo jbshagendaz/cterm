@@ -3,11 +3,15 @@
                               split 
                               trim 
                               trim-newline]])
-  (require [clj-commons-exec :as exec]))
+  (use [clj-commons-exec :as exec]))
 
+
+;;Variables
 (def last-dir (:out @(exec/sh ["pwd"])))
 (def curr-dir (:out @(exec/sh ["pwd"])))
+(def history [])
 
+;;Misc Functions
 (defn get-home []
   (trim-newline (:out @(exec/sh ["printenv" "HOME"]))))
 
@@ -19,7 +23,14 @@
   (printf "$ ")
   (flush))
 
+(defn print-history []
+  (doseq [i (range 0 (count history))]
+    (println i (get history i))))
+
+
+;;User Input Functions
 (defn process-input [input] 
+  "Takes an input line and outputs a map of the analyzed text"
   (let [input-vector (split input #"\s+")
         pipe?        (boolean (re-find #"\|" input))
         cd?          (= "cd" (first input-vector))]
@@ -38,38 +49,39 @@
      ;new process 
      :process? ()}))
 
-(defn execute-input [input]
+(defn execute-input [input-map]
+  "Takes in a map of analyzed input and executes the command"
   (def last-dir curr-dir) 
-  (when (input :rel?) (def curr-dir (str curr-dir "/" (second (input :input-vector)))))
-  (when (input :abs?) (def curr-dir (second (input :input-vector))))
+  (when (input-map :rel?) (def curr-dir (str curr-dir "/" (second (input-map :input-vector)))))
+  (when (input-map :abs?) (def curr-dir (second (input-map :input-vector))))
   
   (cond
-    (input :cd?) (let [output-map @(exec/sh ["cd" curr-dir])]
-                   (when (not (nil? (:err output-map))) 
-                     (do (def curr-dir last-dir)))
-                   output-map)
+    (input-map :cd?) (let [output-map @(exec/sh ["cd" curr-dir])]
+                       (when (not (nil? (:err output-map))) (do (def curr-dir last-dir)))
+                       output-map)
 
-    (input :pipe?) @(last (exec/sh-pipe (input :pipe-input-1) (input :pipe-input-2) {:dir curr-dir}))
-    :else @(exec/sh (input :input-vector) {:dir curr-dir})))
+    (input-map :pipe?) @(last (exec/sh-pipe (input-map :pipe-input-1) 
+                                            (input-map :pipe-input-2) 
+                                            {:dir curr-dir}))
+    
+    :else @(exec/sh (input-map :input-vector) {:dir curr-dir})))
 
 (defn print-output [output-map]
+  "Takes in a map of output and conditionally prints the results"
   (when (not (zero? (output-map :exit))) (printf "error code: %s\n" (output-map :exit)))
   (when (not (nil? (output-map :exc))) (println (output-map :exc)))
   (when (not (nil? (output-map :err))) (println (output-map :err)))
   (when (not (nil? (output-map :out))) (println (output-map :out))))
 
-(defn print-history [history]
-  (doseq [i (range 0 (count history))]
-    (println i (get history i))))
 
+;;Main Function
 (defn -main 
   []
-  (def history [])
   (print-prompt) 
   (doseq  
     [line (take-while (partial not= "quit") (repeatedly read-line))]
      (cond
-       (boolean (re-find #"history" line)) (print-history history)
+       (boolean (re-find #"history" line)) (print-history)
        :else 
         (->> (process-input line) 
              (execute-input)
