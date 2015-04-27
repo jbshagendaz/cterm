@@ -1,10 +1,10 @@
 # cterm
 
-A Clojure library designed to ... well, that part is up to you.
+A Clojure based shell.
 
 ## Usage
 
-FIXME
+
 
 ## License
 
